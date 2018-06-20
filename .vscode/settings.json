@@ -1,6 +1,6 @@
 {
     "terminal.integrated.env.osx": {
-        "PATH": "/Users/davidkopala/.platformio/penv/bin:/Users/davidkopala/.platformio/penv:/Users/davidkopala/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/davidkopala/esp/xtensa-esp32-elf/bin/",
+        "PATH": "/Users/Mac/.platformio/penv/bin:/Users/Mac/.platformio/penv:/Users/Mac/.rbenv/shims:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
         "PLATFORMIO_CALLER": "vscode"
     }
 }
