@@ -1,0 +1,1 @@
+void test_component_func(void);
