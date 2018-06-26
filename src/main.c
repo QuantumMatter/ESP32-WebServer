@@ -14,15 +14,16 @@
 
 #include <string.h>
 
-#include <test_component.h>
+#include <http_constants.h>
 #include <http_server.h>
+#include <http_requset.h>
 
 #define WIFI_SSID       "ESP32_WIFI"
 #define WIFI_PSK        "password1234"
 #define WIFI_MAX_CONN   5
 
 #define CONNECTED_BIT   BIT0
-
+ 
 static bool isConnected = false;
 
 char *website = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>ESP WEBSITE</title></head><body><form action=\"/update.html\" method=\"POST\">SSID:<br><input type=\"text\" name=\"ssid\"/><br>Password:<br><input type=\"password\" name=\"psk\"/><br><input type=\"submit\" value=\"Submit\"/></form></body></html>";
@@ -38,6 +39,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
             ESP_LOGI(TAG, "station:"MACSTR" join, AID=%d",
                     MAC2STR(event->event_info.sta_connected.mac),
                     event->event_info.sta_connected.aid);
+                http_test_get();
             break;
 
         case SYSTEM_EVENT_AP_STADISCONNECTED:
@@ -47,12 +49,16 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
             break;
 
         case SYSTEM_EVENT_STA_START:
+            printf("SYSTEM_EVENT_STA_START\n");
             esp_wifi_connect();
             break;
 
         case SYSTEM_EVENT_STA_GOT_IP:
+            printf("SYSTEM_EVENT_STA_GOT_IP\n");
             xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
             isConnected = true;
+            // http_test_get();
+            http_server_restart();
             break;
 
         case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -64,6 +70,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
             break;
 
         default:
+            printf("Unknown wifi event: %d\n", event->event_id);
             break;
     }
     return ESP_OK;
@@ -91,13 +98,17 @@ void wifi_init_softap(void)
 }
 
 void handle_wifi_creds(char *params) {
-    // printf("PARSING WIFI CREDS\n");
+    printf("PARSING WIFI CREDS\n");
 
     char *ssid_scan = scan_url_encoded(params, "ssid");
     printf("ssid_scan test: %s\n", ssid_scan);
 
     char *psk_scan = scan_url_encoded(params, "psk");
     printf("psk_scan test: %s\n", psk_scan);
+    if (strlen(ssid_scan) < 2) {
+        printf("NOT A VALID SSID!\n");
+        return;
+    }
 
     ESP_ERROR_CHECK( esp_wifi_stop() );
     
@@ -114,20 +125,38 @@ void handle_wifi_creds(char *params) {
 
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &config) );
-    ESP_ERROR_CHECK( esp_wifi_start() );   
+    ESP_ERROR_CHECK( esp_wifi_start() );
 }
+
+// void http_handle_wifi(void *pvParameters) {
+//     char *str = (char *) pvParameters;
+//     printf("wifi_handler task received: %s\n", str);
+//     handle_wifi_creds(str);
+//     vTaskDelete(NULL);
+// }
 
 void http_server_callback(struct http_request *request, char *buffer) 
 {
     if (request->method == HTTP_POST) {
         handle_wifi_creds(request->body);
+        // xTaskCreate(http_handle_wifi, "wifi_handler", 2048, request->body, 10, NULL);
     }
     strcpy(buffer, website);
+}
+
+void http_testing(void *pvParameters) {
+    while (true) {
+        http_test_post();
+        // http_test_get_remote();
+
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+    }
 }
 
 void app_main(void) 
 {
     esp_err_t err = nvs_flash_init();
+    // ESP_ERROR_CHECK( nvs_flash_erase() );
     if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
         ESP_ERROR_CHECK( nvs_flash_erase() );
         err = nvs_flash_init();
@@ -140,11 +169,19 @@ void app_main(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
-    wifi_init_softap();
-
-    test_component_func();
+    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
+    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
+    ESP_ERROR_CHECK( esp_wifi_start() );
+    // wifi_init_softap();
 
     http_server_set_client_callback(&http_server_callback);
-    http_server_start();
-}
 
+    xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, 5000 / portTICK_PERIOD_MS);
+    if (!isConnected) {
+        wifi_init_softap();
+    }
+    http_server_start();
+    http_test_get();
+
+    xTaskCreate(http_testing, "http_test", 4096, NULL, 5, NULL);
+}

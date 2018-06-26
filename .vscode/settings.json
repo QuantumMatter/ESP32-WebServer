@@ -1,12 +1,16 @@
 {
     "terminal.integrated.env.osx": {
-        "PATH": "/Users/Mac/.platformio/penv/bin:/Users/Mac/.platformio/penv:/Users/Mac/.rbenv/shims:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        "PATH": "/Users/davidkopala/.platformio/penv/bin:/Users/davidkopala/.platformio/penv:/Users/davidkopala/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/davidkopala/esp/xtensa-esp32-elf/bin/",
         "PLATFORMIO_CALLER": "vscode"
     },
     "files.associations": {
         "test_component.h": "c",
         "event_groups.h": "c",
         "esp_event_loop.h": "c",
-        "esp_wifi.h": "c"
+        "esp_wifi.h": "c",
+        "sys.h": "c",
+        "array": "c",
+        "initializer_list": "c",
+        "system_error": "cpp"
     }
 }
