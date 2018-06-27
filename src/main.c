@@ -16,19 +16,22 @@
 
 #include <http_constants.h>
 #include <http_server.h>
-#include <http_requset.h>
+#include <http_request.h>
+
+#include "esp_heap_trace.h"
+
+#define NUM_RECORDS 100
+static heap_trace_record_t trace_record[NUM_RECORDS]; // This buffer must be in internal RAM
 
 #define WIFI_SSID       "ESP32_WIFI"
 #define WIFI_PSK        "password1234"
 #define WIFI_MAX_CONN   5
 
 #define CONNECTED_BIT   BIT0
- 
 static bool isConnected = false;
+static EventGroupHandle_t wifi_event_group;
 
 char *website = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>ESP WEBSITE</title></head><body><form action=\"/update.html\" method=\"POST\">SSID:<br><input type=\"text\" name=\"ssid\"/><br>Password:<br><input type=\"password\" name=\"psk\"/><br><input type=\"submit\" value=\"Submit\"/></form></body></html>";
-
-static EventGroupHandle_t wifi_event_group;
 
 void wifi_init_softap(void);
 static esp_err_t event_handler(void *ctx, system_event_t *event)
@@ -39,7 +42,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
             ESP_LOGI(TAG, "station:"MACSTR" join, AID=%d",
                     MAC2STR(event->event_info.sta_connected.mac),
                     event->event_info.sta_connected.aid);
-                http_test_get();
+                // http_test_get();
             break;
 
         case SYSTEM_EVENT_AP_STADISCONNECTED:
@@ -146,11 +149,14 @@ void http_server_callback(struct http_request *request, char *buffer)
 
 void http_testing(void *pvParameters) {
     while (true) {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // ESP_ERROR_CHECK( heap_trace_start(HEAP_TRACE_LEAKS) );
         http_test_post();
+        // ESP_ERROR_CHECK( heap_trace_stop() );
+        // heap_trace_dump();
         // http_test_get_remote();
-
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
+    vTaskDelete(NULL);
 }
 
 void app_main(void) 
@@ -181,7 +187,8 @@ void app_main(void)
         wifi_init_softap();
     }
     http_server_start();
-    http_test_get();
+    // http_test_get();
 
+    // ESP_ERROR_CHECK( heap_trace_init_standalone(trace_record, NUM_RECORDS) );
     xTaskCreate(http_testing, "http_test", 4096, NULL, 5, NULL);
 }

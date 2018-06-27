@@ -24,10 +24,11 @@ void make_request(http_request_t *request, char *url, http_method_t method);
 void make_request_from_text(http_method_t *request, char *data);
 void make_request_text(http_request_t *request, char *buffer, size_t sz);
 void http_requset_add_header(http_request_t *request, char *key, char *value);
+void free_http_request(http_request_t *request);
 
 void http_send_request(http_request_t *request);
-void http_test_get();
-void http_test_get_remote(void);
+// void http_test_get();
+// void http_test_get_remote(void);
 void http_test_post(void);
 
 void http_request_default_fail(http_request_t *request, http_request_fail_t error_code);

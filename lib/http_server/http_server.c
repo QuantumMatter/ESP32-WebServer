@@ -18,7 +18,7 @@ char *header  = "HTTP/1.0 200\nContent-type: text/html; charset=\"utf-8\"\n\n";
 char *http_server_default_website = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>ESP WEBSITE</title></head><body>This is the default ESP Website! Add a callback to customize the response!</body></html>";
 char *complete_response;
 
-void make_http_request(struct http_request *request, char *data) {
+void make_http_request(http_request_t *request, char *data) {
     // printf("Searching for request method...\n");
     switch (data[0]) {
         case 'G':
@@ -31,6 +31,10 @@ void make_http_request(struct http_request *request, char *data) {
             request->method = HTTP_ERROR;
             break;
     }
+
+    request->headers = (char *) malloc(1);
+    *(request->headers) = 0;
+
     // printf("Searching for path...\n");
     char *start = data;
     do { start++; } while (*start != '/');
@@ -77,7 +81,7 @@ void make_http_request(struct http_request *request, char *data) {
     }
 }
 
-void http_request_print(struct http_request *request)
+void http_request_print(http_request_t *request)
 {
     printf("Method: ");
     switch (request->method) {
@@ -113,6 +117,9 @@ char *scan_url_encoded(char *data, char *key) {
         printf("COUND NOT FIND VALUE FOR KEY: %s\n", key);
         char *ret = malloc(1);
         *ret = 0;
+
+        free(url_key);
+        url_key = NULL;
         return ret;
     }
     data += strlen(url_key);
@@ -134,15 +141,18 @@ char *scan_url_encoded(char *data, char *key) {
         }
     }
 
+    free(url_key);
+    url_key = NULL;
+
     return ret;
 }
 
-void default_client_callback(struct http_request *request, char *buffer) {
+void default_client_callback(http_request_t *request, char *buffer) {
     strcpy(buffer, http_server_default_website);
 }
 
-void (*http_server_client_callback)(struct http_request *request, char *buffer) = &default_client_callback;
-void http_server_set_client_callback(void (*callback)(struct http_request *request, char *buffer)) {
+void (*http_server_client_callback)(http_request_t *request, char *buffer) = &default_client_callback;
+void http_server_set_client_callback(void (*callback)(http_request_t *request, char *buffer)) {
     http_server_client_callback = callback;
 }
 
@@ -164,7 +174,7 @@ void http_client_task(void *pvParameters)
         return;
     }
 
-    struct http_request request;
+    http_request_t request;
     make_http_request(&request, buffer);
     http_request_print(&request);
 
@@ -177,6 +187,11 @@ void http_client_task(void *pvParameters)
     snprintf(response, strlen(header) + strlen(body) + 1, "%s%s", header, body);
     
     write(fd, response, strlen(response));
+
+    free_http_request(&request);
+
+    free(buffer);
+    buffer = NULL;
 
     free(response);
     response = NULL;

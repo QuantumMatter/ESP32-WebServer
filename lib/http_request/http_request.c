@@ -1,4 +1,4 @@
-#include <http_requset.h>
+#include <http_request.h>
 
 #include <freertos/FreeRTOS.h>
 
@@ -49,14 +49,18 @@ void http_requset_add_header(http_request_t *request, char *key, char *value) {
     sprintf(header, "\n%s: %s", key, value);
 
     if (strlen(request->headers) == 0) {
+        free(request->headers);
         request->headers = (char *) malloc(512);
         bzero(request->headers, 512);
     }
 
     memcpy(request->headers + strlen(request->headers), header, strlen(header));
+    free(header);
+    header = NULL;
 }
 
 void http_request_get_header(http_request_t *request, char *key, char *value) {
+    // printf("Getting header: %s\n", key);
     char *headers = request->headers;
     while (!str_cmp(headers, key) && *headers != 0) {
         headers++;
@@ -72,6 +76,15 @@ void http_request_get_header(http_request_t *request, char *key, char *value) {
     
     size_t sz = (end - headers) + 1;
     memcpy(value, headers, sz);
+}
+
+void http_request_set_body(http_request_t *request, char *body) {
+    free(request->body);
+    size_t sz = strlen(body) + 1;
+    // printf("Length: %d; Body: %s\n", sz, body);
+    request->body = malloc(sz);
+    bzero(request->body, sz);
+    memcpy(request->body, body, sz);
 }
 
 char *ss_cpy(char *destination, char *source) {
@@ -169,7 +182,7 @@ void http_request_send(http_request_t *request) {
         .ai_socktype = SOCK_STREAM,
     };
     struct addrinfo *serv;
-    struct in_addr *addr;
+    // struct in_addr *addr;
     int s, r;
 
     int err = getaddrinfo(request->host, "80", &hints, &serv);
@@ -179,7 +192,7 @@ void http_request_send(http_request_t *request) {
         return;
     }
 
-    addr = &((struct sockaddr_in *) serv->ai_addr)->sin_addr;
+    // addr = &((struct sockaddr_in *) serv->ai_addr)->sin_addr;
     // printf("DNS Lookup successful; IP=%s\n", inet_ntoa(*addr));
 
     s = socket(serv->ai_family, serv->ai_socktype, 0);
@@ -212,7 +225,7 @@ void http_request_send(http_request_t *request) {
     // printf("... Sent request!\n");
 
     struct timeval receive_timeout;
-    receive_timeout.tv_sec = 5;
+    receive_timeout.tv_sec = 2;
     receive_timeout.tv_usec = 0;
     if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &receive_timeout, sizeof(receive_timeout)) < 0) {
         request_callback->fail(request, HTTP_REQUEST_FAIL_SET_TIMEOUT);
@@ -229,8 +242,10 @@ void http_request_send(http_request_t *request) {
     // printf("\n------\n... Finished Reading!\n\n");
 
     close(s);
+    printf("Freeing http_request_send data...");
     free(data);
     data = NULL;
+    printf("DONE!\n");
 }
 
 void http_test_get() {
@@ -243,18 +258,33 @@ void http_test_get() {
     free(verbose);
     verbose = NULL;
     http_request_send(&request);
+    // free_http_request(&request);
+    printf("Trying to free request...");
+    free(request.host);
+    free(request.path);
+    free(request.body);
+    free(request.headers);
+    printf("Done!");
 }
 
 void http_test_get_remote(void) {
     http_request_t request;
     make_request(&request, "http://davidkopala.com/lederbord/test.html", HTTP_GET);
     http_request_send(&request);
+    // free_http_request(&request);
+    printf("Trying to free request...");
+    free(request.host);
+    free(request.path);
+    free(request.body);
+    free(request.headers);
+    printf("Done!");
 }
 
 void http_test_post(void) {
     http_request_t request;
     make_request(&request, "http://192.168.4.2/", HTTP_POST);
-    request.body = "Hello From ESP!";
+    // request.body = "{\"jsonrpc\":\"2.0\", \"method\":\"testing\", \"parameters\":\"\"}";
+    http_request_set_body(&request, "{\"jsonrpc\":\"2.0\", \"method\":\"testing\", \"parameters\":\"\"}");
 
     char *verbose = (char *) malloc(1024);
     bzero(verbose, 1024);
@@ -264,4 +294,22 @@ void http_test_post(void) {
     verbose = NULL;
 
     http_request_send(&request);
+    free_http_request(&request);
+}
+
+void free_http_request(http_request_t *request) {
+    // printf("Freeing http_request_t\n");
+    // printf("... body\n");
+    free(request->body);
+    request->body = NULL;
+    // printf("... headers\n");
+    free(request->headers);
+    request->headers = NULL;
+    // printf("... host\n");
+    free(request->host);
+    request->host = NULL;
+    // printf("... path\n");
+    free(request->path);
+    request->path = NULL;
+    // printf("Done!\n");
 }
